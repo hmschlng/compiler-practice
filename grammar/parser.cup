@@ -1,0 +1,80 @@
+package grammar;
+
+import java.util.*;
+import java.io.*;
+import java_cup.runtime.*;
+
+action code {:
+	Hashtable symbolTable = new Hashtable();
+:};
+
+parser code {:
+	private Yylex lexer;
+	private File file;
+
+	public parser(File file) {
+		this();
+		this.file = file;
+		try {
+			lexer = new Yylex(new FileReader(file));
+		} 
+		catch (IOException exception) {
+			throw new Error("Unable to open file \"" + file + "\"" );
+		}
+	}
+:};
+
+scan with {:
+	return lexer.yylex();
+:};
+
+
+terminal LEFT, RIGHT, NEWLINE, PLUS, MINUS, TIMES, DIVIDE, ASSIGN;
+terminal String NUMBER;
+terminal String IDENT;
+
+nonterminal StmtList, Stmt;
+nonterminal Integer Expr, Term, Factor;
+
+
+StmtList::= 
+	
+	| StmtList Stmt
+;
+
+Stmt::= 			
+	IDENT:ident ASSIGN Expr:expr NEWLINE 	{: symbolTable.put(ident, expr);	:}
+	|	Expr:expr NEWLINE 								 	{: System.out.println(expr.intValue());	:}
+	|	error NEWLINE
+	|	NEWLINE
+;
+
+Expr::=				
+	Expr:expr PLUS Term:term 			{: RESULT = new Integer(expr.intValue() + term.intValue()); :}
+	|	Expr:expr MINUS Term:term 	{: RESULT = new Integer(expr.intValue() - term.intValue()); :}
+	| Term:term 									{: RESULT = term; :}
+	|	MINUS Term:term 						{: RESULT = new Integer(-(term.intValue())); :}
+;
+
+Term::=				
+	Term:term TIMES Factor:factor			{: RESULT = new Integer(term.intValue() * factor.intValue()); :}
+	|	Term:term DIVIDE Factor:factor 	{: RESULT = new Integer(term.intValue() / factor.intValue()); :}
+	|	Factor:factor 									{: RESULT = factor; :}
+;
+
+Factor::=			
+	LEFT Expr:expr RIGHT 	{: 	RESULT = expr; :}
+	|	NUMBER:value 				{:	RESULT = new Integer(value); :}
+	| IDENT:ident 				{:	
+													Integer value = (Integer) symbolTable.get(ident);
+													if(value == null) {
+														parser.report_error(
+															"Undeclared Identifier " + ident,
+															new Symbol(sym.IDENT, identleft, identright, ident)
+														);
+														value = new Integer(0);	
+													}
+													RESULT = value;
+												:}
+;
+
